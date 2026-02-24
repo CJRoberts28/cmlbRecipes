@@ -141,13 +141,37 @@ function esc(s) { return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g
 // ── API calls ──────────────────────────────────────────────
 async function fetchRecipes() {
   const t = setTimeout(()=>{ const el=document.getElementById("wake-msg"); if(el) el.style.opacity="1"; }, 4000);
-  try {
-    const r = await fetch(`${API}/recipes`);
-    if(!r.ok) throw new Error(`API ${r.status}`);
-    state.recipes = await r.json();
-    state.loading = false;
-  } catch(e) { state.error=e.message; state.loading=false; }
-  clearTimeout(t); render();
+  const MAX_ATTEMPTS = 5;
+  const RETRY_DELAY = 8000; // 8 seconds between retries
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000); // 15s per attempt
+      const r = await fetch(`${API}/recipes`, { signal: controller.signal });
+      clearTimeout(timeout);
+      if (!r.ok) throw new Error(`API ${r.status}`);
+      state.recipes = await r.json();
+      state.loading = false;
+      clearTimeout(t);
+      render();
+      return;
+    } catch(e) {
+      if (attempt < MAX_ATTEMPTS) {
+        // Update wake message with attempt count
+        const el = document.getElementById("wake-msg");
+        if (el) {
+          el.style.opacity = "1";
+          el.textContent = `Server is waking up... (attempt ${attempt}/${MAX_ATTEMPTS})`;
+        }
+        await new Promise(res => setTimeout(res, RETRY_DELAY));
+      } else {
+        state.error = "Could not reach the API after several attempts. Please refresh the page.";
+        state.loading = false;
+        clearTimeout(t);
+        render();
+      }
+    }
+  }
 }
 
 async function saveRecipe() {
