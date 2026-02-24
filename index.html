@@ -328,6 +328,12 @@
   const CATEGORIES = ["All", "Dinner", "Lunch", "Breakfast", "Snack", "Dessert", "Side"];
 
   async function fetchRecipes() {
+    const start = Date.now();
+    let wakeNoticeTimer = setTimeout(() => {
+      const el = document.getElementById("wake-notice");
+      if (el) el.style.opacity = "1";
+    }, 4000);
+
     try {
       const res = await fetch(`${API}/recipes`);
       if (!res.ok) throw new Error(`API error: ${res.status}`);
@@ -337,6 +343,7 @@
       state.error = e.message;
       state.loading = false;
     }
+    clearTimeout(wakeNoticeTimer);
     render();
   }
 
@@ -361,7 +368,16 @@
 
     if (state.loading) {
       root.className = "loading";
-      root.innerHTML = "Loading your recipes...";
+      root.innerHTML = `
+        <div style="text-align:center;">
+          <div style="font-family:'Playfair Display',serif;font-style:italic;font-size:22px;color:var(--text-muted);margin-bottom:16px;">
+            Loading your recipes...
+          </div>
+          <div id="wake-notice" style="opacity:0;transition:opacity 0.8s ease;font-size:15px;color:var(--text-dim);font-family:'Crimson Text',serif;">
+            The server is waking up — this can take up to 60 seconds on first load.<br>Hang tight...
+          </div>
+        </div>
+      `;
       return;
     }
 
