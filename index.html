@@ -663,7 +663,7 @@ function renderForm() {
 
 function renderChatPanelInner() {
   const msgs = state.chatMessages;
-  return `<div class="chat-panel">
+  return `
     <div class="chat-header">
       <h3>✦ Claude's Kitchen</h3>
       <button class="close-chat-btn" id="close-chat">✕</button>
@@ -677,8 +677,7 @@ function renderChatPanelInner() {
     <div class="chat-input-row">
       <textarea class="chat-input" id="chat-input" placeholder="What are you in the mood for?" rows="1"></textarea>
       <button class="chat-send-btn" id="chat-send" ${state.chatLoading?'disabled':''}>➤</button>
-    </div>
-  </div>`;
+    </div>`;
 }
 
 function bindEvents() {
