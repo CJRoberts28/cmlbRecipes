@@ -265,30 +265,43 @@ function formatStep(s, ingredients) {
   if (!s) return '';
   let text = s;
 
-  // Inject ingredient amounts into step text
   if (ingredients && ingredients.length) {
+    // Build a list of {amount, coreName} from each ingredient
+    const parsed = [];
     ingredients.forEach(ing => {
       if (!ing) return;
-      // Match a leading amount: "2 cups butter" → amount="2 cups", item="butter"
-      const amountMatch = ing.match(/^([\d\/\.\-–\s]+(?:°F|°C|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|L\b|quarts?|pints?|cloves?|slices?|pieces?|cans?|sticks?|handfuls?|pinch(?:es)?|dash(?:es)?|sprigs?)?)\s+(.+)/i);
+      // Strip leading amount: "1 pound ground beef, chopped" → amount="1 pound", rest="ground beef, chopped"
+      const amountMatch = ing.match(/^([\d\u00bc-\u00be\u2150-\u215e\/\.\s\-–]+(?:°F|°C|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|L\b|quarts?|pints?|cloves?|slices?|pieces?|cans?|sticks?|handfuls?|pinch(?:es)?|dash(?:es)?|sprigs?|small|medium|large)?)\s+(.+)/i);
       if (!amountMatch) return;
       const amount = amountMatch[1].trim();
-      const item = amountMatch[2].trim();
-      // Look for the item name in the step text (case insensitive)
-      const itemEscaped = item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-      const re = new RegExp(`(?<![<>])\\b(${itemEscaped})\\b`, 'i');
-      text = text.replace(re, `**${amount}** $1`);
+      let rest = amountMatch[2].trim();
+      // Strip prep notes after comma/semicolon: "black beans, drained" → "black beans"
+      rest = rest.split(/,|;/)[0].trim();
+      // Strip leading adjectives like "canned", "frozen", "cooked", "fresh", "dried"
+      rest = rest.replace(/^(canned|frozen|cooked|fresh|dried|roasted|chopped|minced|sliced|diced|shredded|grated|ground)\s+/i, '');
+      if (rest.length > 2) parsed.push({ amount, name: rest });
+    });
+
+    // Sort longest name first to avoid partial matches
+    parsed.sort((a, b) => b.name.length - a.name.length);
+
+    parsed.forEach(({ amount, name }) => {
+      const nameEscaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`\\b(${nameEscaped})\\b`, 'i');
+      if (re.test(text)) {
+        text = text.replace(re, `**${amount}** $1`);
+      }
     });
   }
 
-  // Now escape and bold **...** markers plus quantities/temps
+  // Escape HTML
   let out = esc(text);
-  // Bold **amount** markers injected above
+  // Render **amount** markers as bold
   out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-  // Bold any remaining standalone quantities + units and temperatures
+  // Bold any remaining standalone quantities + temps not already wrapped
   out = out.replace(
-    /(\d+(?:[\/\.]\d+)?(?:\s*[-–]\s*\d+(?:[\/\.]\d+)?)?)\s*(°F|°C|degrees?F?C?|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|L\b|quarts?|pints?|gallons?|inches?|in\b|minutes?|mins?|hours?|hrs?|seconds?|secs?|cloves?|slices?|pieces?|cans?|jars?|packages?|sticks?|handfuls?|pinch(?:es)?|dash(?:es)?|sprigs?)/gi,
-    (match) => match.startsWith('<') ? match : `<strong>${match}</strong>`
+    /(?<!<strong>)(\d+(?:[\/\.]\d+)?(?:\s*[-–]\s*\d+(?:[\/\.]\d+)?)?)\s*(°F|°C|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|quarts?|pints?|minutes?|mins?|hours?|hrs?|seconds?)(?!<\/strong>)/gi,
+    '<strong>$1 $2</strong>'
   );
   return out;
 }
