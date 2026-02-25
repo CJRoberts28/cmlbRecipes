@@ -1,6 +1,6 @@
 # CMLB Recipe Catalog
 
-CJ & Lauren's private recipe catalog with Google Auth, Firestore storage, and Claude-powered recipe suggestions.
+Chris & Lindsay's private recipe catalog with Google Auth, Firestore storage, and Claude-powered recipe suggestions.
 
 ## Live Site
 [https://cjroberts28.github.io/cmlbRecipes](https://cjroberts28.github.io/cmlbRecipes)
