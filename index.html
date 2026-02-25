@@ -169,6 +169,43 @@
     @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
     .fade-in { animation:fadeIn 0.25s ease forwards; }
     .loading-screen { display:flex; align-items:center; justify-content:center; height:100vh; font-family:'Playfair Display',serif; font-style:italic; font-size:20px; color:var(--text-muted); background:var(--bg); }
+
+    /* ── Bottom nav (mobile only) ── */
+    .bottom-nav { display:none; }
+
+    /* ── Tablet: 768px-1024px ── */
+    @media (max-width: 1024px) {
+      .chat-panel { display:none; }
+      .chat-panel.mobile-open { display:flex; position:fixed; inset:0; z-index:200; width:100%; border-left:none; }
+      .sidebar { width:240px; }
+      .main { padding:24px 28px; }
+    }
+
+    /* ── Mobile: up to 767px ── */
+    @media (max-width: 767px) {
+      .login-card { padding:36px 24px; margin:16px; }
+      .app { flex-direction:column; height:100vh; position:relative; overflow:hidden; }
+      .sidebar { width:100%; flex-shrink:0; border-right:none; border-bottom:1px solid var(--border); height:100vh; position:absolute; inset:0; z-index:100; transition:transform 0.25s ease; }
+      .sidebar.hidden { transform:translateX(-100%); }
+      .main { flex:1; padding:20px 18px 80px; position:absolute; inset:0; z-index:50; overflow-y:auto; background:var(--bg); transition:opacity 0.2s; }
+      .main.hidden { opacity:0; pointer-events:none; }
+      .chat-panel { display:none; position:fixed; inset:0; z-index:200; width:100%; border-left:none; }
+      .chat-panel.mobile-open { display:flex; }
+      .component-grid { grid-template-columns:1fr; gap:16px; }
+      .form-wrap { max-width:100%; }
+      .recipe-title { font-size:22px; }
+      .bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; z-index:150; background:var(--surface); border-top:1px solid var(--border); height:60px; }
+      .bottom-nav button { flex:1; background:none; border:none; color:var(--text-muted); font-family:'Lora',serif; font-size:11px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; transition:color 0.15s; padding:0; }
+      .bottom-nav button.active { color:var(--accent); }
+      .bottom-nav button .nav-icon { font-size:20px; line-height:1; }
+      .chat-btn { display:none; }
+      .recipe-item { padding:14px 16px; }
+      .recipe-item-title { font-size:15px; }
+      .action-row { position:sticky; top:0; background:var(--bg); padding:10px 0; z-index:10; border-bottom:1px solid var(--border); margin-bottom:16px; }
+      .back-btn { display:inline-flex; align-items:center; gap:6px; background:none; border:none; color:var(--accent); font-family:'Lora',serif; font-size:14px; cursor:pointer; padding:6px 0; margin-bottom:12px; }
+      .back-btn::before { content:'←'; font-size:16px; }
+    }
+    @media (min-width:768px) { .back-btn { display:none; } }
   </style>
 </head>
 <body>
@@ -288,7 +325,7 @@ async function saveRecipe() {
       state.recipes.unshift(newRecipe);
       state.selected = newRecipe;
     }
-    state.view="detail"; state.successMsg="Recipe saved!";
+    state.view="detail"; state.successMsg="Recipe saved!"; mobilePanel="detail";
     state.formError=null; state.editingId=null;
   } catch(e) {
     state.formError="Failed to save: "+e.message;
@@ -394,13 +431,14 @@ function loadRecipeFromChat() {
   state.formError = null;
   state.successMsg = null;
   state.view = "form";
+  mobilePanel = "form";
   render();
 }
 
 // ── Form helpers ──────────────────────────────────────────
 function startAdd() {
   state.form=emptyForm(); state.editingId=null;
-  state.formError=null; state.successMsg=null; state.view="form"; render();
+  state.formError=null; state.successMsg=null; state.view="form"; mobilePanel="form"; render();
 }
 function startEdit(r) {
   state.form={
@@ -413,7 +451,7 @@ function startEdit(r) {
       steps:c.steps?.length?[...c.steps]:[""]
     }))
   };
-  state.editingId=r.id; state.formError=null; state.successMsg=null; state.view="form"; render();
+  state.editingId=r.id; state.formError=null; state.successMsg=null; state.view="form"; mobilePanel="form"; render();
 }
 function syncForm() {
   const g=id=>document.getElementById(id); const f=state.form;
@@ -448,6 +486,10 @@ function renderLogin() {
   document.getElementById("google-signin-btn").addEventListener("click", signIn);
 }
 
+let mobilePanel = "list"; // list | detail | form | chat
+
+function isMobile() { return window.innerWidth <= 767; }
+
 function render() {
   if (!state.user) { renderLogin(); return; }
   const filtered = state.recipes.filter(r=>{
@@ -457,9 +499,17 @@ function render() {
     return mc&&ms;
   });
 
+  const mobile = isMobile();
+  // On mobile, sync mobilePanel with state.view
+  if (mobile) {
+    if (state.view === 'form') mobilePanel = 'form';
+    else if (state.view === 'detail' && state.selected) mobilePanel = 'detail';
+    else if (state.showChat) mobilePanel = 'chat';
+  }
+
   document.getElementById("root").innerHTML=`
   <div class="app">
-    <div class="sidebar">
+    <div class="sidebar${mobile && mobilePanel !== 'list' ? ' hidden' : ''}">
       <div class="sidebar-header">
         <h1>🍽 CMLB Recipes</h1>
         <div class="user-row">
@@ -491,14 +541,27 @@ function render() {
       </div>
     </div>
 
-    <div class="main">
+    <div class="main${mobile && mobilePanel === 'list' ? ' hidden' : ''}">
       ${state.successMsg?`<div class="success-msg fade-in">✓ ${esc(state.successMsg)}</div>`:''}
       ${state.view==='form'?renderForm():''}
       ${state.view==='detail'&&state.selected?renderDetail(state.selected):''}
       ${state.view==='list'?`<div class="empty-state"><div class="icon">🍳</div><h2>Select a recipe to view it</h2><p>Or ask Claude for inspiration.</p></div>`:''}
     </div>
 
-    ${state.showChat?renderChatPanel():''}
+    ${state.showChat?`<div class="chat-panel${mobile?' mobile-open':''}">${renderChatPanelInner()}</div>`:''}
+
+    ${mobile ? `
+    <nav class="bottom-nav">
+      <button class="${mobilePanel==='list'?'active':''}" id="nav-list">
+        <span class="nav-icon">📋</span><span>Recipes</span>
+      </button>
+      <button class="${mobilePanel==='detail'||mobilePanel==='form'?'active':''}" id="nav-detail" ${!state.selected&&state.view!=='form'?'disabled':''}>
+        <span class="nav-icon">${state.view==='form'?'✎':'🍽'}</span><span>${state.view==='form'?'Form':'Detail'}</span>
+      </button>
+      <button class="${mobilePanel==='chat'?'active':''}" id="nav-chat">
+        <span class="nav-icon">✦</span><span>Claude</span>
+      </button>
+    </nav>` : ''}
   </div>`;
 
   bindEvents();
@@ -511,6 +574,7 @@ function render() {
 function renderDetail(r) {
   const comps=Array.isArray(r.components)?r.components:(typeof r.components==='string'?JSON.parse(r.components):[]);
   return `<div class="fade-in">
+    <button class="back-btn" id="back-btn">Back to Recipes</button>
     <div class="action-row">
       <button class="btn" id="edit-btn">✎ Edit</button>
       <button class="btn btn-danger" id="del-btn">✕ Delete</button>
@@ -597,7 +661,7 @@ function renderForm() {
   </div>`;
 }
 
-function renderChatPanel() {
+function renderChatPanelInner() {
   const msgs = state.chatMessages;
   return `<div class="chat-panel">
     <div class="chat-header">
@@ -621,16 +685,21 @@ function bindEvents() {
   const on=(sel,ev,fn)=>document.querySelectorAll(sel).forEach(el=>el.addEventListener(ev,fn));
   const g=id=>document.getElementById(id);
 
-  g("signout-btn")?.addEventListener("click",()=>signOut(auth));
+  g("back-btn")?.addEventListener("click",()=>{
+    state.view="list"; state.selected=null; mobilePanel="list"; render();
+  });
+  g("nav-list")?.addEventListener("click",()=>{ mobilePanel="list"; state.view="list"; state.showChat=false; render(); });
+  g("nav-detail")?.addEventListener("click",()=>{ if(state.selected||state.view==='form'){ mobilePanel=state.view==='form'?'form':'detail'; state.showChat=false; render(); } });
+  g("nav-chat")?.addEventListener("click",()=>{ mobilePanel="chat"; state.showChat=true; render(); });
   g("search-input")?.addEventListener("input",e=>{state.search=e.target.value;render();});
   on(".filter-btn","click",e=>{state.category=e.currentTarget.dataset.cat;render();});
   on(".recipe-item","click",e=>{
     const r=state.recipes.find(r=>r.id===e.currentTarget.dataset.id);
-    if(r){state.selected=r;state.view="detail";state.successMsg=null;render();}
+    if(r){state.selected=r;state.view="detail";state.successMsg=null;mobilePanel="detail";render();}
   });
-  g("add-btn")?.addEventListener("click",startAdd);
+  g("add-btn")?.addEventListener("click",()=>{ startAdd(); mobilePanel="form"; });
   g("chat-btn")?.addEventListener("click",()=>{state.showChat=!state.showChat;render();});
-  g("close-chat")?.addEventListener("click",()=>{state.showChat=false;render();});
+  g("close-chat")?.addEventListener("click",()=>{state.showChat=false;mobilePanel=state.selected?"detail":"list";render();});
   g("edit-btn")?.addEventListener("click",()=>startEdit(state.selected));
   g("del-btn")?.addEventListener("click",()=>deleteRecipe(state.selected.id));
   on(".star","click",e=>{
@@ -644,7 +713,11 @@ function bindEvents() {
   on(".add-step","click",e=>{syncForm();state.form.components[+e.currentTarget.dataset.ci].steps.push("");render();});
   on(".rm-step","click",e=>{syncForm();const{ci,si}=e.currentTarget.dataset;state.form.components[+ci].steps.splice(+si,1);render();});
   g("save-btn")?.addEventListener("click",saveRecipe);
-  g("cancel-btn")?.addEventListener("click",()=>{state.view=state.selected?"detail":"list";state.formError=null;render();});
+  g("cancel-btn")?.addEventListener("click",()=>{
+    state.view=state.selected?"detail":"list";
+    mobilePanel=state.selected?"detail":"list";
+    state.formError=null;render();
+  });
   g("load-recipe-btn")?.addEventListener("click",loadRecipeFromChat);
 
   // Chat
