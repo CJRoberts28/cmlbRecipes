@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="80" fill="#f4f0e8"/>
+  
+  <!-- Subtle border -->
+  <rect x="24" y="24" width="464" height="464" rx="64" fill="none" stroke="#d4c9b4" stroke-width="8"/>
+
+  <!-- Decorative corner flourishes -->
+  <text x="48" y="88" font-family="Georgia, serif" font-size="40" fill="#d4c9b4">✦</text>
+  <text x="424" y="88" font-family="Georgia, serif" font-size="40" fill="#d4c9b4">✦</text>
+  <text x="48" y="480" font-family="Georgia, serif" font-size="40" fill="#d4c9b4">✦</text>
+  <text x="424" y="480" font-family="Georgia, serif" font-size="40" fill="#d4c9b4">✦</text>
+
+  <!-- Fork -->
+  <g transform="translate(148, 100)">
+    <!-- Handle -->
+    <rect x="25" y="220" width="18" height="140" rx="9" fill="#7a4a2a"/>
+    <!-- Stem -->
+    <rect x="28" y="120" width="12" height="110" rx="4" fill="#7a4a2a"/>
+    <!-- Tines -->
+    <rect x="14" y="60" width="6" height="75" rx="3" fill="#7a4a2a"/>
+    <rect x="24" y="60" width="6" height="75" rx="3" fill="#7a4a2a"/>
+    <rect x="34" y="60" width="6" height="75" rx="3" fill="#7a4a2a"/>
+    <rect x="44" y="60" width="6" height="75" rx="3" fill="#7a4a2a"/>
+  </g>
+
+  <!-- Knife -->
+  <g transform="translate(278, 100)">
+    <!-- Handle -->
+    <rect x="25" y="220" width="18" height="140" rx="9" fill="#7a4a2a"/>
+    <!-- Stem -->
+    <rect x="28" y="120" width="12" height="110" rx="4" fill="#7a4a2a"/>
+    <!-- Blade -->
+    <path d="M28 120 L28 55 Q28 45 50 40 L50 120 Z" fill="#b07040"/>
+  </g>
+
+  <!-- Plate -->
+  <ellipse cx="256" cy="290" rx="100" ry="14" fill="#d4c9b4" opacity="0.5"/>
+  <circle cx="256" cy="272" r="96" fill="none" stroke="#b07040" stroke-width="5"/>
+  <circle cx="256" cy="272" r="80" fill="#faf7f2"/>
+
+  <!-- Monogram C & L on plate -->
+  <text x="256" y="298" font-family="Georgia, serif" font-style="italic" font-size="64" fill="#7a4a2a" text-anchor="middle">C&amp;L</text>
+</svg>
