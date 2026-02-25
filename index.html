@@ -261,16 +261,36 @@ function todayStr() { return new Date().toISOString().split("T")[0]; }
 function stars(n) { return "★".repeat(n||0)+"☆".repeat(5-(n||0)); }
 function esc(s) { return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
 
-function formatStep(s) {
+function formatStep(s, ingredients) {
   if (!s) return '';
-  // Escape first, then bold matches
-  let text = esc(s);
-  // Match quantities + units, temperatures, and standalone numbers with context
-  text = text.replace(
-    /(\d+(?:[\/\.]\d+)?(?:\s*[-–]\s*\d+(?:[\/\.]\d+)?)?)\s*(°F|°C|degrees?F?C?|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|L\b|quarts?|pints?|gallons?|inches?|in\b|minutes?|mins?|hours?|hrs?|seconds?|secs?|cloves?|slices?|pieces?|cans?|jars?|packages?|lbs?|sticks?|handfuls?|pinch(?:es)?|dash(?:es)?|sprigs?)/gi,
-    '<strong>$&</strong>'
+  let text = s;
+
+  // Inject ingredient amounts into step text
+  if (ingredients && ingredients.length) {
+    ingredients.forEach(ing => {
+      if (!ing) return;
+      // Match a leading amount: "2 cups butter" → amount="2 cups", item="butter"
+      const amountMatch = ing.match(/^([\d\/\.\-–\s]+(?:°F|°C|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|L\b|quarts?|pints?|cloves?|slices?|pieces?|cans?|sticks?|handfuls?|pinch(?:es)?|dash(?:es)?|sprigs?)?)\s+(.+)/i);
+      if (!amountMatch) return;
+      const amount = amountMatch[1].trim();
+      const item = amountMatch[2].trim();
+      // Look for the item name in the step text (case insensitive)
+      const itemEscaped = item.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+      const re = new RegExp(`(?<![<>])\\b(${itemEscaped})\\b`, 'i');
+      text = text.replace(re, `**${amount}** $1`);
+    });
+  }
+
+  // Now escape and bold **...** markers plus quantities/temps
+  let out = esc(text);
+  // Bold **amount** markers injected above
+  out = out.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+  // Bold any remaining standalone quantities + units and temperatures
+  out = out.replace(
+    /(\d+(?:[\/\.]\d+)?(?:\s*[-–]\s*\d+(?:[\/\.]\d+)?)?)\s*(°F|°C|degrees?F?C?|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|L\b|quarts?|pints?|gallons?|inches?|in\b|minutes?|mins?|hours?|hrs?|seconds?|secs?|cloves?|slices?|pieces?|cans?|jars?|packages?|sticks?|handfuls?|pinch(?:es)?|dash(?:es)?|sprigs?)/gi,
+    (match) => match.startsWith('<') ? match : `<strong>${match}</strong>`
   );
-  return text;
+  return out;
 }
 
 // ── Auth ──────────────────────────────────────────────────
@@ -617,7 +637,7 @@ function renderDetail(r) {
           </div>
           <div>
             <div class="col-label">Method</div>
-            ${(c.steps||[]).map((s,i)=>`<div class="step-item"><span class="step-num">${i+1}.</span><span>${formatStep(s)}</span></div>`).join('')}
+            ${(c.steps||[]).map((s,i)=>`<div class="step-item"><span class="step-num">${i+1}.</span><span>${formatStep(s, c.ingredients||[])}</span></div>`).join('')}
           </div>
         </div>
       </div>`).join('')}
