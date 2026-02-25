@@ -102,6 +102,7 @@
     .ingredient-item { display:flex; align-items:baseline; gap:8px; padding:6px 0; border-bottom:1px solid var(--surface2); font-size:15px; color:var(--text); }
     .ingredient-item::before { content:'—'; color:var(--accent-light); flex-shrink:0; font-size:12px; }
     .step-item { display:flex; gap:10px; padding:7px 0; border-bottom:1px solid var(--surface2); font-size:15px; color:var(--text-muted); line-height:1.65; }
+    .step-item strong { color:var(--accent); font-weight:600; }
     .step-num { color:var(--accent); font-family:'Playfair Display',serif; font-size:15px; flex-shrink:0; width:18px; font-style:italic; }
     .action-row { display:flex; gap:8px; margin-bottom:22px; }
     .btn { padding:7px 16px; border-radius:3px; font-family:'Lora',serif; font-size:14px; cursor:pointer; border:1px solid var(--border); background:var(--surface); color:var(--text-muted); transition:all 0.2s; }
@@ -259,6 +260,18 @@ function emptyForm() {
 function todayStr() { return new Date().toISOString().split("T")[0]; }
 function stars(n) { return "★".repeat(n||0)+"☆".repeat(5-(n||0)); }
 function esc(s) { return s==null?'':String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+function formatStep(s) {
+  if (!s) return '';
+  // Escape first, then bold matches
+  let text = esc(s);
+  // Match quantities + units, temperatures, and standalone numbers with context
+  text = text.replace(
+    /(\d+(?:[\/\.]\d+)?(?:\s*[-–]\s*\d+(?:[\/\.]\d+)?)?)\s*(°F|°C|degrees?F?C?|cups?|tbsp|tsp|tablespoons?|teaspoons?|oz|ounces?|lbs?|pounds?|grams?|g\b|kg|ml|liters?|L\b|quarts?|pints?|gallons?|inches?|in\b|minutes?|mins?|hours?|hrs?|seconds?|secs?|cloves?|slices?|pieces?|cans?|jars?|packages?|lbs?|sticks?|handfuls?|pinch(?:es)?|dash(?:es)?|sprigs?)/gi,
+    '<strong>$&</strong>'
+  );
+  return text;
+}
 
 // ── Auth ──────────────────────────────────────────────────
 async function signIn() {
@@ -604,7 +617,7 @@ function renderDetail(r) {
           </div>
           <div>
             <div class="col-label">Method</div>
-            ${(c.steps||[]).map((s,i)=>`<div class="step-item"><span class="step-num">${i+1}.</span><span>${esc(s)}</span></div>`).join('')}
+            ${(c.steps||[]).map((s,i)=>`<div class="step-item"><span class="step-num">${i+1}.</span><span>${formatStep(s)}</span></div>`).join('')}
           </div>
         </div>
       </div>`).join('')}
