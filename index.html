@@ -191,12 +191,13 @@
       .sidebar.hidden { transform:translateX(-100%); }
       .main { flex:1; padding:20px 18px 80px; position:absolute; inset:0; z-index:50; overflow-y:auto; background:var(--bg); transition:opacity 0.2s; }
       .main.hidden { opacity:0; pointer-events:none; }
-      .chat-panel { display:none; position:fixed; top:0; left:0; right:0; bottom:60px; z-index:200; width:100%; border-left:none; }
+      .chat-panel { display:none; position:fixed; top:0; left:0; right:0; bottom:60px; z-index:200; width:100%; border-left:none; flex-direction:column; }
       .chat-panel.mobile-open { display:flex; }
+      .chat-panel .chat-messages { flex:1; overflow-y:auto; min-height:0; }
+      .chat-panel .chat-input-row { flex-shrink:0; padding-bottom:12px; }
       .component-grid { grid-template-columns:1fr; gap:16px; }
       .form-wrap { max-width:100%; }
       .recipe-title { font-size:22px; }
-      .chat-input-row { padding-bottom: 16px; }
       .bottom-nav { display:flex; position:fixed; bottom:0; left:0; right:0; z-index:300; background:var(--surface); border-top:1px solid var(--border); height:60px; }
       .bottom-nav button { flex:1; background:none; border:none; color:var(--text-muted); font-family:'Lora',serif; font-size:11px; cursor:pointer; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:3px; transition:color 0.15s; padding:0; }
       .bottom-nav button.active { color:var(--accent); }
