@@ -388,9 +388,9 @@ async function requestNotifPermission() {
 
 async function saveNotifSettings(enabled, hour) {
   const newSettings = { enabled, hour: parseInt(hour), lastSent: state.notifSettings?.lastSent || '' };
+  state.notifSettings = newSettings; // update state immediately so UI doesn't revert
   try {
     await setDoc(doc(db, 'settings', 'notifications'), newSettings);
-    state.notifSettings = newSettings;
   } catch(e) { console.warn('Save notif settings error:', e); }
 }
 
