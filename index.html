@@ -222,8 +222,10 @@
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js";
 import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js";
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy }
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, getDoc, setDoc }
   from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
+import { getMessaging, getToken, onMessage }
+  from "https://www.gstatic.com/firebasejs/10.12.0/firebase-messaging.js";
 
 const firebaseConfig = {
   apiKey: "AIzaSyDtszGE-y56VKC0vtXUdRY12Iujuh_lJN8",
@@ -236,12 +238,17 @@ const firebaseConfig = {
 
 const ALLOWED_EMAILS = ["c.jonesroberts@gmail.com", "lrobertsmlt@gmail.com"];
 const ANTHROPIC_API = "https://us-central1-cmlb-recipes.cloudfunctions.net/claudeProxy";
+// SETUP REQUIRED: Replace with your VAPID key from Firebase Console > Project Settings > Cloud Messaging > Web Push certificates
+const VAPID_KEY = "YOUR_VAPID_KEY_HERE";
 const CATS = ["Dinner","Lunch","Breakfast","Snack","Dessert","Side"];
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
+const messaging = getMessaging(app);
 const provider = new GoogleAuthProvider();
+let swRegistration = null;
+let notifMessageUnsubscribe = null;
 
 let state = {
   user: null, recipes: [], selected: null,
@@ -249,7 +256,8 @@ let state = {
   successMsg: null, formError: null,
   editingId: null, form: emptyForm(),
   showChat: false, chatMessages: [], chatLoading: false,
-  pendingRecipe: null
+  pendingRecipe: null,
+  notifPanel: false, notifSettings: null, notifPermission: null, fcmToken: null
 };
 
 function emptyForm() {
@@ -325,12 +333,91 @@ onAuthStateChanged(auth, async (user) => {
   if (user && ALLOWED_EMAILS.includes(user.email)) {
     state.user = user;
     await loadRecipes();
+    initNotifications(); // intentionally non-blocking
     render();
   } else {
     state.user = null;
+    state.fcmToken = null;
+    state.notifSettings = null;
+    state.notifPanel = false;
+    if (notifMessageUnsubscribe) { notifMessageUnsubscribe(); notifMessageUnsubscribe = null; }
     renderLogin();
   }
 });
+
+// ── Notifications ─────────────────────────────────────────
+async function initNotifications() {
+  if (!('Notification' in window) || !('serviceWorker' in navigator)) return;
+  state.notifPermission = Notification.permission;
+  try {
+    const snap = await getDoc(doc(db, 'settings', 'notifications'));
+    state.notifSettings = snap.exists() ? snap.data() : { enabled: false, hour: 17, lastSent: '' };
+    swRegistration = await navigator.serviceWorker.register('/cmlbRecipes/firebase-messaging-sw.js');
+    if (Notification.permission === 'granted') await refreshFCMToken();
+    if (notifMessageUnsubscribe) notifMessageUnsubscribe();
+    notifMessageUnsubscribe = onMessage(messaging, payload => {
+      const { title, body } = payload.notification || {};
+      state.successMsg = body ? `${title}: ${body}` : title;
+      render();
+      setTimeout(() => { state.successMsg = null; render(); }, 8000);
+    });
+    render();
+  } catch(e) { console.warn('Notification init error:', e); }
+}
+
+async function refreshFCMToken() {
+  if (!swRegistration || !VAPID_KEY || VAPID_KEY === 'YOUR_VAPID_KEY_HERE') return;
+  try {
+    const token = await getToken(messaging, { vapidKey: VAPID_KEY, serviceWorkerRegistration: swRegistration });
+    if (token && token !== state.fcmToken) {
+      state.fcmToken = token;
+      await setDoc(doc(db, 'fcm_tokens', state.user.uid), {
+        token, email: state.user.email, updatedAt: new Date().toISOString()
+      });
+      state.notifPermission = 'granted';
+    }
+  } catch(e) { console.warn('FCM token error:', e); }
+}
+
+async function requestNotifPermission() {
+  const perm = await Notification.requestPermission();
+  state.notifPermission = perm;
+  if (perm === 'granted') await refreshFCMToken();
+  render();
+}
+
+async function saveNotifSettings(enabled, hour) {
+  const newSettings = { enabled, hour: parseInt(hour), lastSent: state.notifSettings?.lastSent || '' };
+  try {
+    await setDoc(doc(db, 'settings', 'notifications'), newSettings);
+    state.notifSettings = newSettings;
+  } catch(e) { console.warn('Save notif settings error:', e); }
+}
+
+function renderNotifPanel() {
+  if (!state.notifPanel) return '';
+  const s = state.notifSettings || { enabled: false, hour: 17 };
+  const perm = state.notifPermission;
+  const denied = perm === 'denied';
+  const hourOpts = [];
+  for (let h = 6; h <= 22; h++) {
+    const lbl = h === 12 ? '12 PM' : h < 12 ? `${h} AM` : `${h-12} PM`;
+    hourOpts.push(`<option value="${h}"${s.hour === h ? ' selected' : ''}>${lbl}</option>`);
+  }
+  return `<div style="margin:4px 16px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;padding:12px 14px;">
+    <div style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-muted);margin-bottom:10px;">Dinner Alerts</div>
+    ${denied ? `<p style="color:var(--red);font-size:12px;font-style:italic;margin:0;">Notifications blocked. Check browser settings.</p>` : ''}
+    ${!denied && perm !== 'granted' ? `<button id="notif-enable-btn" style="width:100%;background:var(--accent);border:none;color:#faf7f2;padding:7px 10px;border-radius:3px;font-family:'Lora',serif;font-size:13px;cursor:pointer;">Enable Push Notifications</button>` : ''}
+    ${perm === 'granted' ? `
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:10px;">
+      <input type="checkbox" id="notif-toggle"${s.enabled ? ' checked' : ''} style="width:15px;height:15px;accent-color:var(--accent);">
+      <label for="notif-toggle" style="font-size:13px;color:var(--text);cursor:pointer;font-family:'Lora',serif;">Send daily dinner ideas</label>
+    </div>
+    <label style="font-size:9px;letter-spacing:.15em;text-transform:uppercase;color:var(--text-muted);">Time (Eastern)</label>
+    <select id="notif-hour" style="width:100%;background:var(--surface);border:1px solid var(--border);border-radius:3px;color:var(--text);padding:6px 8px;font-family:'Lora',serif;font-size:13px;margin-top:4px;outline:none;">${hourOpts.join('')}</select>
+    <p style="font-size:11px;color:var(--text-dim);margin-top:6px;font-style:italic;">iPhone: add to Home Screen first (iOS 16.4+)</p>` : ''}
+  </div>`;
+}
 
 // ── Firestore ─────────────────────────────────────────────
 async function loadRecipes() {
@@ -566,9 +653,11 @@ function render() {
         <div class="user-row">
           ${state.user.photoURL?`<img class="user-avatar" src="${esc(state.user.photoURL)}">`:''}
           <span class="user-name">${esc(state.user.displayName||state.user.email)}</span>
+          <button id="notif-bell-btn" title="Dinner notifications" style="background:none;border:none;cursor:pointer;color:${state.notifSettings?.enabled?'var(--accent)':'var(--text-dim)'};font-size:15px;padding:2px 4px;line-height:1;flex-shrink:0;">🔔</button>
           <button class="signout-btn" id="signout-btn">Sign out</button>
         </div>
       </div>
+      ${renderNotifPanel()}
       <button class="add-btn" id="add-btn">+ Add a Recipe</button>
       <button class="chat-btn" id="chat-btn">✦ Ask Claude for Ideas</button>
       <div class="search-wrap">
@@ -790,6 +879,34 @@ function bindEvents() {
       }
     });
   }
+
+  g("signout-btn")?.addEventListener("click", async () => {
+    if (state.user?.uid && state.fcmToken) {
+      try { await deleteDoc(doc(db, 'fcm_tokens', state.user.uid)); } catch(e) {}
+    }
+    signOut(auth);
+  });
+
+  g("notif-bell-btn")?.addEventListener("click", () => {
+    state.notifPanel = !state.notifPanel;
+    render();
+  });
+
+  g("notif-enable-btn")?.addEventListener("click", async () => {
+    await requestNotifPermission();
+  });
+
+  g("notif-toggle")?.addEventListener("change", async e => {
+    const hour = parseInt(document.getElementById('notif-hour')?.value ?? '17');
+    await saveNotifSettings(e.target.checked, hour);
+    render();
+  });
+
+  g("notif-hour")?.addEventListener("change", async e => {
+    const enabled = document.getElementById('notif-toggle')?.checked ?? false;
+    await saveNotifSettings(enabled, parseInt(e.target.value));
+    render();
+  });
 }
 </script>
 </body>
