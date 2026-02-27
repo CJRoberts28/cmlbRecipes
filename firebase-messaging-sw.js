@@ -20,16 +20,17 @@ const messaging = firebase.messaging();
 // Handle background messages (app tab closed or not focused)
 messaging.onBackgroundMessage(function(payload) {
   const title = payload.notification?.title || 'CMLB Recipes';
+  const url = payload.data?.url || 'https://cjroberts28.github.io/cmlbRecipes/';
   const options = {
     body: payload.notification?.body || "Tonight's dinner suggestion is ready.",
     icon: '/cmlbRecipes/favicon.svg',
     badge: '/cmlbRecipes/favicon.svg',
-    data: { url: 'https://cjroberts28.github.io/cmlbRecipes/' }
+    data: { url }
   };
   self.registration.showNotification(title, options);
 });
 
-// On notification click: open or focus the app tab
+// On notification click: navigate to suggestion URL in existing tab or open new one
 self.addEventListener('notificationclick', function(event) {
   event.notification.close();
   const targetUrl = event.notification.data?.url || 'https://cjroberts28.github.io/cmlbRecipes/';
@@ -37,6 +38,7 @@ self.addEventListener('notificationclick', function(event) {
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       for (const client of clientList) {
         if (client.url.includes('cmlbRecipes') && 'focus' in client) {
+          client.navigate(targetUrl);
           return client.focus();
         }
       }

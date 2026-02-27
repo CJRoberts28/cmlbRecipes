@@ -335,6 +335,16 @@ onAuthStateChanged(auth, async (user) => {
     await loadRecipes();
     initNotifications(); // intentionally non-blocking
     render();
+    // If opened from a dinner suggestion notification, open chat and ask for the full recipe
+    const urlParams = new URLSearchParams(window.location.search);
+    const suggestion = urlParams.get('suggestion');
+    if (suggestion) {
+      window.history.replaceState({}, '', window.location.pathname);
+      state.showChat = true;
+      mobilePanel = 'chat';
+      render();
+      setTimeout(() => sendChat(`We got a dinner notification suggesting "${suggestion}" for tonight — can you give us the full recipe with ingredients and steps?`), 150);
+    }
   } else {
     state.user = null;
     state.fcmToken = null;

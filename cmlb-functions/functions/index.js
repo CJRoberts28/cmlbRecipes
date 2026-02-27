@@ -137,8 +137,7 @@ exports.sendDinnerSuggestion = onSchedule(
 
     const systemPrompt = `You are a dinner suggestion assistant for Chris and Lindsay's private recipe catalog.
 Suggest one specific dinner for tonight. Either revisit a recipe they love or propose something new that fits their taste.
-Keep it very short: one sentence for the suggestion name and one sentence explaining why it fits tonight.
-Do not include JSON or recipe tags. Be warm and direct.`;
+Respond with ONLY valid JSON, no other text: {"title": "Recipe Name", "tagline": "One warm sentence explaining why it fits tonight."}`;
 
     const userMessage = `Their top-rated and favorite recipes:\n${catalogSummary}\n\nAll recipe titles (for context — don't just repeat these):\n${allTitles}\n\nWhat should they make for dinner tonight?`;
 
@@ -158,13 +157,24 @@ Do not include JSON or recipe tags. Be warm and direct.`;
       }),
     });
     const anthropicData = await anthropicRes.json();
-    const suggestion = (anthropicData.content?.[0]?.text || "").trim()
-      || "How about revisiting one of your favorites tonight?";
+    let suggestionTitle = null;
+    let suggestionTagline = "Tonight's dinner suggestion is ready!";
+    try {
+      const raw = (anthropicData.content?.[0]?.text || "").trim();
+      const parsed = JSON.parse(raw);
+      suggestionTitle = parsed.title || null;
+      suggestionTagline = parsed.tagline || suggestionTagline;
+    } catch (e) {
+      console.warn("Failed to parse Claude suggestion JSON:", e.message);
+    }
 
-    console.log("Suggestion:", suggestion);
+    console.log("Suggestion:", suggestionTitle, "-", suggestionTagline);
 
     // 8. Send FCM multicast notification to all registered users
-    const notifBody = suggestion.length > 180 ? suggestion.slice(0, 177) + "..." : suggestion;
+    const notifBody = suggestionTagline.length > 180 ? suggestionTagline.slice(0, 177) + "..." : suggestionTagline;
+    const suggestionUrl = suggestionTitle
+      ? `https://cjroberts28.github.io/cmlbRecipes/?suggestion=${encodeURIComponent(suggestionTitle)}`
+      : "https://cjroberts28.github.io/cmlbRecipes/";
     const fcmPayload = {
       notification: {
         title: "Tonight's Dinner Idea",
@@ -177,9 +187,10 @@ Do not include JSON or recipe tags. Be warm and direct.`;
           requireInteraction: false,
         },
         fcmOptions: {
-          link: "https://cjroberts28.github.io/cmlbRecipes/",
+          link: suggestionUrl,
         },
       },
+      data: { url: suggestionUrl },
       tokens,
     };
 
